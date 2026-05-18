@@ -1,0 +1,608 @@
+version: 2
+
+# =============================================================================
+# Staging layer
+# -----------------------------------------------------------------------------
+# 1:1 cleaned mirrors of OLTP tables. Rules for this layer:
+#   - One staging model per source table.
+#   - Only renaming, light casting, and very simple flags (e.g. is_active_*).
+#   - NO joins. NO business logic. NO aggregations.
+#   - snake_case columns. PK column ends in `_id`. Timestamps end in `_at`.
+#   - Materialized as `view` (configured in dbt_project.yml).
+# =============================================================================
+
+models:
+
+  # ---------------------------------------------------------------------------
+  # REFERENCE / LOOKUP
+  # ---------------------------------------------------------------------------
+
+  - name: stg_roles
+    description: "Staging of `Roles`. Lookup of user roles (Passenger / Driver)."
+    columns:
+      - name: role_id
+        description: "Primary key."
+        data_tests:
+          - unique
+          - not_null
+      - name: role_name
+        description: "Role label."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Passenger', 'Driver']
+
+  - name: stg_vehicle_types
+    description: "Staging of `VehicleTypes`. Catalog of supported vehicle types."
+    columns:
+      - name: vehicle_type_id
+        data_tests:
+          - unique
+          - not_null
+      - name: type_name
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Scooter', 'Sedan', 'Motorcycle', 'PickupTruck', 'HalfTruck']
+      - name: passenger_capacity
+      - name: max_cargo_weight_kg
+
+  - name: stg_business_domains
+    description: "Staging of `BusinessDomains`. Top-level service domains (Mobility / Carrier / Freight)."
+    columns:
+      - name: domain_id
+        data_tests:
+          - unique
+          - not_null
+      - name: domain_name
+        data_tests:
+          - unique
+          - not_null
+          - accepted_values:
+              values: ['Mobility', 'Carrier', 'Freight']
+
+  - name: stg_governorates
+    description: "Staging of `Governorates`. Top of the geography hierarchy."
+    columns:
+      - name: governorate_id
+        data_tests:
+          - unique
+          - not_null
+
+  - name: stg_cancellation_reasons
+    description: "Staging of `CancellationReasons`. Catalog of cancellation reasons."
+    columns:
+      - name: cancellation_reason_id
+        data_tests:
+          - unique
+          - not_null
+      - name: reason_title
+        data_tests:
+          - not_null
+      - name: applies_to
+        data_tests:
+          - accepted_values:
+              values: ['Passenger', 'Driver', 'System', 'Any']
+
+  - name: stg_subscription_plans
+    description: "Staging of `SubscriptionPlans`. Catalog of subscription offerings."
+    columns:
+      - name: plan_id
+        data_tests:
+          - unique
+          - not_null
+      - name: plan_code
+        data_tests:
+          - unique
+          - not_null
+      - name: monthly_price_egp
+        data_tests:
+          - not_null
+      - name: discount_type
+        data_tests:
+          - accepted_values:
+              values: ['Percentage', 'Amount']
+              config:
+                where: "discount_type is not null"
+      - name: is_active
+        data_tests:
+          - not_null
+
+  - name: stg_promo_codes
+    description: "Staging of `PromoCodes`. Catalog of promotional codes."
+    columns:
+      - name: promo_code_id
+        data_tests:
+          - unique
+          - not_null
+      - name: code
+        data_tests:
+          - unique
+          - not_null
+      - name: discount_type
+        data_tests:
+          - accepted_values:
+              values: ['Percentage', 'Amount']
+              config:
+                where: "discount_type is not null"
+      - name: is_active
+        data_tests:
+          - not_null
+
+  # ---------------------------------------------------------------------------
+  # IDENTITY
+  # ---------------------------------------------------------------------------
+
+  - name: stg_users
+    description: >
+      Staging of `Users`. Account-level info for everyone on the platform.
+      `PasswordHash` is intentionally excluded from the warehouse.
+    columns:
+      - name: user_id
+        description: "Business key from OLTP."
+        data_tests:
+          - unique
+          - not_null
+      - name: account_status
+        data_tests:
+          - accepted_values:
+              values: ['Active', 'Inactive']
+              config:
+                where: "account_status is not null"
+
+  - name: stg_drivers
+    description: "Staging of `Drivers`. 1:1 specialisation of `stg_users` for drivers."
+    columns:
+      - name: driver_id
+        description: "Business key. Same value as the corresponding `user_id` in stg_users."
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_users')
+              field: user_id
+      - name: military_service_status
+        data_tests:
+          - accepted_values:
+              values: ['Completed', 'Exempted', 'Postponed', 'N/A']
+              config:
+                where: "military_service_status is not null"
+
+  - name: stg_user_roles
+    description: "Staging of `UserRoles` bridge table (composite PK: user_id + role_id)."
+    columns:
+      - name: user_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_users')
+              field: user_id
+      - name: role_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_roles')
+              field: role_id
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - user_id
+            - role_id
+
+  # ---------------------------------------------------------------------------
+  # FLEET & PREFERENCES
+  # ---------------------------------------------------------------------------
+
+  - name: stg_preferences
+    description: "Staging of `Preferences`. Service-level preference, belongs to a business domain."
+    columns:
+      - name: preference_id
+        data_tests:
+          - unique
+          - not_null
+      - name: preference_name
+        data_tests:
+          - not_null
+      - name: domain_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_business_domains')
+              field: domain_id
+
+  - name: stg_vehicles
+    description: "Staging of `Vehicles`. Vehicle inventory."
+    columns:
+      - name: vehicle_id
+        data_tests:
+          - unique
+          - not_null
+      - name: vehicle_type_id
+        data_tests:
+          - relationships:
+              to: ref('stg_vehicle_types')
+              field: vehicle_type_id
+              config:
+                where: "vehicle_type_id is not null"
+      - name: license_plate_ar
+        data_tests:
+          - not_null
+
+  - name: stg_vehicle_type_preference
+    description: "Staging of `VehicleTypePreference` bridge table (composite PK: vehicle_type_id + preference_id)."
+    columns:
+      - name: vehicle_type_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_vehicle_types')
+              field: vehicle_type_id
+      - name: preference_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_preferences')
+              field: preference_id
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - vehicle_type_id
+            - preference_id
+
+  - name: stg_driver_licenses
+    description: "Staging of `DriverLicenses`. Driving licenses issued to drivers (full history)."
+    columns:
+      - name: license_id
+        data_tests:
+          - unique
+          - not_null
+      - name: driver_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_drivers')
+              field: driver_id
+      - name: license_number
+        data_tests:
+          - unique
+          - not_null
+      - name: license_type
+        data_tests:
+          - accepted_values:
+              values: ['Private', 'Truck', 'Motorcycle']
+              config:
+                where: "license_type is not null"
+      - name: expiry_date
+        data_tests:
+          - not_null
+
+  - name: stg_background_checks
+    description: "Staging of `BackgroundChecks`. Background checks performed on drivers."
+    columns:
+      - name: background_check_id
+        data_tests:
+          - unique
+          - not_null
+      - name: driver_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_drivers')
+              field: driver_id
+      - name: outcome
+        data_tests:
+          - accepted_values:
+              values: ['Passed', 'Failed']
+              config:
+                where: "outcome is not null"
+
+  - name: stg_driver_vehicles
+    description: "Staging of `DriverVehicles`. Driver-to-vehicle assignment history."
+    columns:
+      - name: assignment_id
+        data_tests:
+          - unique
+          - not_null
+      - name: vehicle_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_vehicles')
+              field: vehicle_id
+      - name: driver_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_drivers')
+              field: driver_id
+      - name: assignment_type
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Owned', 'Rented', 'Platform Owned', 'Other']
+
+
+  - name: stg_cities
+    description: "Staging of `Cities`. Cities belong to one governorate."
+    columns:
+      - name: city_id
+        data_tests:
+          - unique
+          - not_null
+      - name: governorate_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_governorates')
+              field: governorate_id
+
+  - name: stg_zones
+    description: "Staging of `Zones`. Zones belong to one city. Used as ride pickup/dropoff anchors."
+    columns:
+      - name: zone_id
+        data_tests:
+          - unique
+          - not_null
+      - name: city_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_cities')
+              field: city_id
+      - name: is_active
+        data_tests:
+          - not_null
+
+  - name: stg_sessions
+    description: >
+      Staging of `Sessions`. A driver-online session = driver + vehicle + preference
+      between `online_at` and `offline_at`.
+    columns:
+      - name: session_id
+        data_tests:
+          - unique
+          - not_null
+      - name: driver_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_drivers')
+              field: driver_id
+      - name: vehicle_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_vehicles')
+              field: vehicle_id
+      - name: preference_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_preferences')
+              field: preference_id
+      - name: online_at
+        data_tests:
+          - not_null
+
+  - name: stg_user_wallet
+    description: "Staging of `UserWallet`. One wallet per user (1:1)."
+    columns:
+      - name: wallet_id
+        data_tests:
+          - unique
+          - not_null
+      - name: user_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_users')
+              field: user_id
+      - name: balance
+        data_tests:
+          - not_null
+      - name: currency
+        data_tests:
+          - not_null
+
+  - name: stg_user_subscriptions
+    description: "Staging of `UserSubscriptions`. Subscription periods with locked-in pricing."
+    columns:
+      - name: user_subscription_id
+        data_tests:
+          - unique
+          - not_null
+      - name: user_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_users')
+              field: user_id
+      - name: plan_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_subscription_plans')
+              field: plan_id
+      - name: status
+        data_tests:
+          - accepted_values:
+              values: ['Active', 'Expired', 'Cancelled']
+              config:
+                where: "status is not null"
+      - name: locked_discount_type
+        data_tests:
+          - accepted_values:
+              values: ['Percentage', 'Amount']
+              config:
+                where: "locked_discount_type is not null"
+
+  # ---------------------------------------------------------------------------
+  # RIDES & HISTORY
+  # ---------------------------------------------------------------------------
+
+  - name: stg_rides
+    description: "Staging of `Rides`. One row per requested ride (any status)."
+    columns:
+      - name: ride_id
+        data_tests:
+          - unique
+          - not_null
+      - name: user_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_users')
+              field: user_id
+      - name: session_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_sessions')
+              field: session_id
+      - name: pickup_zone_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_zones')
+              field: zone_id
+      - name: dropoff_zone_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_zones')
+              field: zone_id
+      - name: current_status
+        data_tests:
+          - accepted_values:
+              values: ['Requested', 'Accepted', 'Completed', 'Cancelled']
+              config:
+                where: "current_status is not null"
+
+  - name: stg_ride_status_history
+    description: "Staging of `RideStatusHistory`. Audit log of status transitions per ride."
+    columns:
+      - name: status_history_id
+        data_tests:
+          - unique
+          - not_null
+      - name: ride_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_rides')
+              field: ride_id
+      - name: status
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Requested', 'Accepted', 'Completed', 'Cancelled']
+      - name: changed_at
+        data_tests:
+          - not_null
+      - name: cancellation_reason_id
+        data_tests:
+          - relationships:
+              to: ref('stg_cancellation_reasons')
+              field: cancellation_reason_id
+              config:
+                where: "cancellation_reason_id is not null"
+
+  - name: stg_ride_ratings
+    description: "Staging of `RideRatings`. Star/comment ratings issued for a ride."
+    columns:
+      - name: rating_id
+        data_tests:
+          - unique
+          - not_null
+      - name: ride_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_rides')
+              field: ride_id
+
+  # ---------------------------------------------------------------------------
+  # PROMO REDEMPTIONS & PAYMENTS
+  # ---------------------------------------------------------------------------
+
+  - name: stg_promo_code_redemptions
+    description: "Staging of `PromoCodeRedemptions`. One row per promo redemption per ride."
+    columns:
+      - name: redemption_id
+        data_tests:
+          - unique
+          - not_null
+      - name: promo_code_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_promo_codes')
+              field: promo_code_id
+      - name: user_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_users')
+              field: user_id
+      - name: ride_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_rides')
+              field: ride_id
+      - name: discount_amount_applied
+        data_tests:
+          - not_null
+      - name: redeemed_at
+        data_tests:
+          - not_null
+
+  - name: stg_payments
+    description: >
+      Staging of `Payments`. One row per payment event (ride payment, subscription payment,
+      or refund). Refund rows carry non-positive amounts.
+    columns:
+      - name: payment_id
+        data_tests:
+          - unique
+          - not_null
+      - name: user_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_users')
+              field: user_id
+      - name: ride_id
+        data_tests:
+          - relationships:
+              to: ref('stg_rides')
+              field: ride_id
+              config:
+                where: "ride_id is not null"
+      - name: promo_code_redemption_id
+        data_tests:
+          - relationships:
+              to: ref('stg_promo_code_redemptions')
+              field: redemption_id
+              config:
+                where: "promo_code_redemption_id is not null"
+      - name: subscription_id
+        data_tests:
+          - relationships:
+              to: ref('stg_user_subscriptions')
+              field: user_subscription_id
+              config:
+                where: "subscription_id is not null"
+      - name: status
+        data_tests:
+          - accepted_values:
+              values: ['Pending', 'Completed', 'Failed', 'Refunded']
+              config:
+                where: "status is not null"
+      - name: is_refund
+        description: "1 when status = 'Refunded', else 0."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]

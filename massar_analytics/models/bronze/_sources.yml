@@ -1,0 +1,646 @@
+version: 2
+
+sources:
+  - name: gp_smarttransport
+    description: >
+      Operational (OLTP) database for the GP Smart Transport platform.
+    database: GP_SmartTransportDB
+    schema: dbo
+    loaded_at_field: null   # set per-table where a reliable timestamp exists
+
+    tables:
+      - name: Roles
+        description: "Lookup of user roles{Passenger, Driver}"
+        columns:
+          - name: RoleId
+            description: "Surrogate / business identifier of the role."
+            data_tests:
+              - unique
+              - not_null
+          - name: RoleName
+            description: "Human-readable role name."
+            data_tests:
+              - not_null
+              - accepted_values:
+                  values: ['Passenger', 'Driver']
+
+      - name: VehicleTypes
+        description: "Lookup of vehicle types with capacity & weight limits."
+        columns:
+          - name: VehicleTypeId
+            data_tests:
+              - unique
+              - not_null
+          - name: TypeName
+            data_tests:
+              - not_null
+              - accepted_values:
+                  values: ['Scooter', 'Sedan', 'Motorcycle', 'PickupTruck', 'HalfTruck']
+          - name: PassengerCapacity
+            description: "Max passengers, between 1 and 10 when set."
+          - name: MaxCargoWeightKg
+            description: "Max cargo weight in kilograms; non-negative when set."
+
+      - name: BusinessDomains
+        description: "Lookup of business domains (Mobility, Carrier, Freight)."
+        columns:
+          - name: DomainId
+            data_tests:
+              - unique
+              - not_null
+          - name: DomainName
+            data_tests:
+              - unique
+              - not_null
+              - accepted_values:
+                  values: ['Mobility', 'Carrier', 'Freight']
+
+      - name: Governorates
+        description: "Egyptian governorates (top level of geography hierarchy)."
+        columns:
+          - name: GovernorateId
+            data_tests:
+              - unique
+              - not_null
+          - name: GovernorateNameAr
+          - name: GovernorateNameEn
+
+      - name: CancellationReasons
+        description: "Catalog of reasons a ride can be cancelled by any party."
+        columns:
+          - name: CancellationReasonId
+            data_tests:
+              - unique
+              - not_null
+          - name: ReasonTitle
+            data_tests:
+              - not_null
+          - name: AppliesTo
+            data_tests:
+              - accepted_values:
+                  values: ['Passenger', 'Driver', 'System', 'Any']
+
+      - name: SubscriptionPlans
+        description: "Catalog of subscription plans offered to passengers."
+        columns:
+          - name: PlanId
+            data_tests:
+              - unique
+              - not_null
+          - name: PlanCode
+            data_tests:
+              - unique
+              - not_null
+          - name: PlanNameAr
+            data_tests:
+              - not_null
+          - name: PlanNameEn
+            data_tests:
+              - not_null
+          - name: MonthlyPriceEGP
+            description: "Monthly price in EGP; non-negative."
+            data_tests:
+              - not_null
+          - name: DiscountType
+            data_tests:
+              - accepted_values:
+                  values: ['Percentage', 'Amount']
+                  config:
+                    where: "DiscountType IS NOT NULL"
+          - name: IsActive
+            data_tests:
+              - not_null
+
+      - name: PromoCodes
+        description: "Catalog of promotional discount codes."
+        columns:
+          - name: PromoCodeId
+            data_tests:
+              - unique
+              - not_null
+          - name: Code
+            data_tests:
+              - unique
+              - not_null
+          - name: DiscountType
+            data_tests:
+              - accepted_values:
+                  values: ['Percentage', 'Amount']
+                  config:
+                    where: "DiscountType IS NOT NULL"
+          - name: IsActive
+            data_tests:
+              - not_null
+
+      - name: Users
+        description: "All platform users (passengers + drivers share this table)."
+        columns:
+          - name: UserId
+            data_tests:
+              - unique
+              - not_null
+          - name: NationalId
+            data_tests:
+              - unique:
+                  config:
+                    where: "NationalId IS NOT NULL"
+          - name: Email
+            data_tests:
+              - unique:
+                  config:
+                    where: "Email IS NOT NULL"
+          - name: FacebookId
+            data_tests:
+              - unique:
+                  config:
+                    where: "FacebookId IS NOT NULL"
+          - name: AccountStatus
+            data_tests:
+              - accepted_values:
+                  values: ['Active', 'Inactive']
+                  config:
+                    where: "AccountStatus IS NOT NULL"
+
+      - name: Drivers
+        description: >
+          Driver-specific specialisation of Users (1:1).
+          DriverId is BOTH the PK and the FK back to Users.UserId.
+        columns:
+          - name: DriverId
+            data_tests:
+              - unique
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Users')
+                  field: UserId
+          - name: NationalId
+            data_tests:
+              - unique:
+                  config:
+                    where: "NationalId IS NOT NULL"
+          - name: MilitaryServiceStatus
+            data_tests:
+              - accepted_values:
+                  values: ['Completed', 'Exempted', 'Postponed', 'N/A']
+                  config:
+                    where: "MilitaryServiceStatus IS NOT NULL"
+          - name: CurrentRating
+            description: "Current driver rating in [1.0, 5.0]."
+
+      - name: UserRoles
+        description: "Bridge table assigning roles to users (composite PK)."
+        columns:
+          - name: UserId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Users')
+                  field: UserId
+          - name: RoleId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Roles')
+                  field: RoleId
+        data_tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns:
+                - UserId
+                - RoleId
+
+      - name: Preferences
+        description: "Service-level preference (Economy, VIP, Heavy, ...). Belongs to a BusinessDomain."
+        columns:
+          - name: PreferenceId
+            data_tests:
+              - unique
+              - not_null
+          - name: PreferenceName
+            data_tests:
+              - not_null
+          - name: DomainId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'BusinessDomains')
+                  field: DomainId
+
+      - name: Vehicles
+        description: "Vehicle inventory (with brand, plate, AC, type)."
+        columns:
+          - name: VehicleId
+            data_tests:
+              - unique
+              - not_null
+          - name: VehicleTypeId
+            data_tests:
+              - relationships:
+                  to: source('gp_smarttransport', 'VehicleTypes')
+                  field: VehicleTypeId
+                  config:
+                    where: "VehicleTypeId IS NOT NULL"
+          - name: LicensePlateAr
+            data_tests:
+              - not_null
+
+      - name: VehicleTypePreference
+        description: "Bridge: which preferences are available for each vehicle type (composite PK)."
+        columns:
+          - name: VehicleTypeId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'VehicleTypes')
+                  field: VehicleTypeId
+          - name: PreferenceId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Preferences')
+                  field: PreferenceId
+        data_tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns:
+                - VehicleTypeId
+                - PreferenceId
+
+      - name: DriverLicenses
+        description: "Driving licenses issued to drivers (full history kept)."
+        columns:
+          - name: LicenseId
+            data_tests:
+              - unique
+              - not_null
+          - name: DriverId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Drivers')
+                  field: DriverId
+          - name: LicenseNumber
+            data_tests:
+              - unique
+              - not_null
+          - name: LicenseType
+            data_tests:
+              - accepted_values:
+                  values: ['Private', 'Truck', 'Motorcycle']
+                  config:
+                    where: "LicenseType IS NOT NULL"
+          - name: ExpiryDate
+            data_tests:
+              - not_null
+
+      - name: BackgroundChecks
+        description: "Criminal-record checks performed on drivers."
+        columns:
+          - name: BackgroundCheckId
+            data_tests:
+              - unique
+              - not_null
+          - name: DriverId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Drivers')
+                  field: DriverId
+          - name: CertificateType
+            data_tests:
+              - accepted_values:
+                  values: ['Criminal Background Check']
+                  config:
+                    where: "CertificateType IS NOT NULL"
+          - name: Outcome
+            data_tests:
+              - accepted_values:
+                  values: ['Passed', 'Failed']
+                  config:
+                    where: "Outcome IS NOT NULL"
+
+      - name: DriverVehicles
+        description: >
+          Driver-to-vehicle assignment history. A vehicle has at most one OPEN
+          assignment (EndDate IS NULL) at a time (enforced via filtered unique index).
+        columns:
+          - name: AssignmentId
+            data_tests:
+              - unique
+              - not_null
+          - name: VehicleId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Vehicles')
+                  field: VehicleId
+          - name: DriverId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Drivers')
+                  field: DriverId
+          - name: AssignmentType
+            data_tests:
+              - not_null
+              - accepted_values:
+                  values: ['Owned', 'Rented', 'Platform Owned', 'Other']
+          - name: StartDate
+            data_tests:
+              - not_null
+
+      - name: Cities
+        description: "Cities, each belonging to one governorate."
+        columns:
+          - name: CityId
+            data_tests:
+              - unique
+              - not_null
+          - name: GovernorateId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Governorates')
+                  field: GovernorateId
+          - name: CityNameAr
+            data_tests:
+              - not_null
+          - name: CityNameEn
+            data_tests:
+              - not_null
+
+      - name: Zones
+        description: "Zones inside cities. Used as pickup / dropoff anchors for rides."
+        columns:
+          - name: ZoneId
+            data_tests:
+              - unique
+              - not_null
+          - name: CityId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Cities')
+                  field: CityId
+          - name: ZoneNameAr
+            data_tests:
+              - not_null
+          - name: ZoneNameEn
+            data_tests:
+              - not_null
+          - name: IsActive
+            data_tests:
+              - not_null
+
+      - name: Sessions
+        description: >
+          A driver "online" session: driver + vehicle + preference being served.
+          A driver can have at most one OPEN session (OfflineAt IS NULL) at a time
+          (enforced via filtered unique index).
+        columns:
+          - name: SessionId
+            data_tests:
+              - unique
+              - not_null
+          - name: DriverId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Drivers')
+                  field: DriverId
+          - name: VehicleId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Vehicles')
+                  field: VehicleId
+          - name: PreferenceId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Preferences')
+                  field: PreferenceId
+          - name: OnlineAt
+            data_tests:
+              - not_null
+
+      - name: UserWallet
+        description: "User in-app wallet (1:1 with Users). Default currency EGP."
+        columns:
+          - name: WalletId
+            data_tests:
+              - unique
+              - not_null
+          - name: UserId
+            data_tests:
+              - unique
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Users')
+                  field: UserId
+          - name: Balance
+            description: "Non-negative balance."
+            data_tests:
+              - not_null
+          - name: Currency
+            data_tests:
+              - not_null
+          - name: UpdatedAt
+            data_tests:
+              - not_null
+
+      - name: UserSubscriptions
+        description: "Subscription history per user, with locked-in pricing snapshots."
+        columns:
+          - name: UserSubscriptionId
+            data_tests:
+              - unique
+              - not_null
+          - name: UserId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Users')
+                  field: UserId
+          - name: PlanId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'SubscriptionPlans')
+                  field: PlanId
+          - name: Status
+            data_tests:
+              - accepted_values:
+                  values: ['Active', 'Expired', 'Cancelled']
+                  config:
+                    where: "Status IS NOT NULL"
+          - name: LockedDiscountType
+            data_tests:
+              - accepted_values:
+                  values: ['Percentage', 'Amount']
+                  config:
+                    where: "LockedDiscountType IS NOT NULL"
+
+      - name: Rides
+        description: "Each requested ride (whether completed or cancelled)."
+        loaded_at_field: ExpectedStartTime
+        columns:
+          - name: RideId
+            data_tests:
+              - unique
+              - not_null
+          - name: UserId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Users')
+                  field: UserId
+          - name: SessionId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Sessions')
+                  field: SessionId
+          - name: PickupZoneId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Zones')
+                  field: ZoneId
+          - name: DropoffZoneId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Zones')
+                  field: ZoneId
+          - name: CurrentStatus
+            data_tests:
+              - accepted_values:
+                  values: ['Requested', 'Accepted', 'Completed', 'Cancelled']
+                  config:
+                    where: "CurrentStatus IS NOT NULL"
+
+      - name: RideStatusHistory
+        description: "Audit log of status transitions per ride."
+        loaded_at_field: ChangedAt
+        columns:
+          - name: StatusHistoryId
+            data_tests:
+              - unique
+              - not_null
+          - name: RideId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Rides')
+                  field: RideId
+          - name: Status
+            data_tests:
+              - not_null
+              - accepted_values:
+                  values: ['Requested', 'Accepted', 'Completed', 'Cancelled']
+          - name: ChangedAt
+            data_tests:
+              - not_null
+          - name: CancellationReasonId
+            data_tests:
+              - relationships:
+                  to: source('gp_smarttransport', 'CancellationReasons')
+                  field: CancellationReasonId
+                  config:
+                    where: "CancellationReasonId IS NOT NULL"
+
+      - name: RideRatings
+        description: "Star/comment ratings issued for a ride (by either passenger or driver)."
+        loaded_at_field: CreatedAt
+        columns:
+          - name: RatingId
+            data_tests:
+              - unique
+              - not_null
+          - name: RideId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Rides')
+                  field: RideId
+          - name: RaterRole
+            description: "Who issued the rating (Passenger or Driver)."
+          - name: Score
+            description: "Rating score, expected in [1, 5]."
+
+      - name: PromoCodeRedemptions
+        description: "One row per promo-code redemption against a ride."
+        loaded_at_field: RedeemedAt
+        columns:
+          - name: RedemptionId
+            data_tests:
+              - unique
+              - not_null
+          - name: PromoCodeId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'PromoCodes')
+                  field: PromoCodeId
+          - name: UserId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Users')
+                  field: UserId
+          - name: RideId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Rides')
+                  field: RideId
+          - name: DiscountAmountApplied
+            description: "Non-negative discount amount."
+            data_tests:
+              - not_null
+          - name: RedeemedAt
+            data_tests:
+              - not_null
+
+      - name: Payments
+        description: >
+          One row per payment event (ride payment, subscription payment, or refund).
+          Refund rows carry non-positive amounts; others non-negative.
+        loaded_at_field: OccurredAt
+        columns:
+          - name: PaymentId
+            data_tests:
+              - unique
+              - not_null
+          - name: UserId
+            data_tests:
+              - not_null
+              - relationships:
+                  to: source('gp_smarttransport', 'Users')
+                  field: UserId
+          - name: RideId
+            data_tests:
+              - relationships:
+                  to: source('gp_smarttransport', 'Rides')
+                  field: RideId
+                  config:
+                    where: "RideId IS NOT NULL"
+          - name: PromoCodeRedemptionId
+            data_tests:
+              - relationships:
+                  to: source('gp_smarttransport', 'PromoCodeRedemptions')
+                  field: RedemptionId
+                  config:
+                    where: "PromoCodeRedemptionId IS NOT NULL"
+          - name: SubscriptionId
+            data_tests:
+              - relationships:
+                  to: source('gp_smarttransport', 'UserSubscriptions')
+                  field: UserSubscriptionId
+                  config:
+                    where: "SubscriptionId IS NOT NULL"
+          - name: Status
+            data_tests:
+              - accepted_values:
+                  values: ['Pending', 'Completed', 'Failed', 'Refunded']
+                  config:
+                    where: "Status IS NOT NULL"

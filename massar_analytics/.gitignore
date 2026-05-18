@@ -1,0 +1,9 @@
+# dbt-generated artifacts (never commit)
+target/
+dbt_packages/
+logs/
+.user.yml
+
+# local credentials / overrides
+profiles.yml
+.env

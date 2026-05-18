@@ -1,0 +1,55 @@
+# ============================================================
+# Massar / GP Smart Transportation — .gitignore
+# ============================================================
+
+# ---------- SQL Server files (NEVER commit, very large)
+*.mdf
+*.ldf
+*.ndf
+*.trn
+
+# ---------- dbt generated artifacts
+**/target/
+**/dbt_packages/
+**/logs/
+**/.user.yml
+**/profiles.yml
+
+# ---------- Python (ETL or scripts)
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+
+# ---------- SSMS / Visual Studio
+.vs/
+*.suo
+*.user
+*.sln.docstates
+*.dbmdl
+*.jfm
+*.cache
+
+# ---------- Editors
+.idea/
+.vscode/
+*.swp
+
+# ---------- OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- Logs / temp
+*.log
+logs/
+tmp/
+temp/
+
+# ---------- Local secrets
+*.env
+secrets/
+ConnectionStrings.config
