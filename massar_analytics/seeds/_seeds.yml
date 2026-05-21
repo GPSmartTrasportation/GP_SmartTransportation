@@ -1,0 +1,19 @@
+version: 2
+
+seeds:
+  - name: egypt_occasions
+    description: >
+      Egypt occasion date ranges (2024-2026) for dim_date: Ramadan, Eid al-Fitr, Eid al-Adha only.
+      Islamic dates are approximate; update yearly from official announcements.
+    columns:
+      - name: start_date
+        data_tests:
+          - not_null
+      - name: end_date
+        data_tests:
+          - not_null
+      - name: occasion_name
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['Ramadan', 'Eid al-Fitr', 'Eid al-Adha']

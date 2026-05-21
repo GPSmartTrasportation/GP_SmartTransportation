@@ -11,7 +11,7 @@ renamed as (
         UserId                      as user_id,
         RideId                      as ride_id,
         PromoCodeRedemptionId       as promo_code_redemption_id,
-        SubscriptionId              as subscription_id,
+        SubscriptionId              as user_subscription_id,
         PaymentType                 as payment_type,
         Status                      as status,
         Amount                      as amount,
