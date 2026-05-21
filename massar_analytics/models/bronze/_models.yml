@@ -1,21 +1,6 @@
 version: 2
 
-# =============================================================================
-# Staging layer
-# -----------------------------------------------------------------------------
-# 1:1 cleaned mirrors of OLTP tables. Rules for this layer:
-#   - One staging model per source table.
-#   - Only renaming, light casting, and very simple flags (e.g. is_active_*).
-#   - NO joins. NO business logic. NO aggregations.
-#   - snake_case columns. PK column ends in `_id`. Timestamps end in `_at`.
-#   - Materialized as `view` (configured in dbt_project.yml).
-# =============================================================================
-
 models:
-
-  # ---------------------------------------------------------------------------
-  # REFERENCE / LOOKUP
-  # ---------------------------------------------------------------------------
 
   - name: stg_roles
     description: "Staging of `Roles`. Lookup of user roles (Passenger / Driver)."
@@ -129,10 +114,6 @@ models:
         data_tests:
           - not_null
 
-  # ---------------------------------------------------------------------------
-  # IDENTITY
-  # ---------------------------------------------------------------------------
-
   - name: stg_users
     description: >
       Staging of `Users`. Account-level info for everyone on the platform.
@@ -188,10 +169,6 @@ models:
           combination_of_columns:
             - user_id
             - role_id
-
-  # ---------------------------------------------------------------------------
-  # FLEET & PREFERENCES
-  # ---------------------------------------------------------------------------
 
   - name: stg_preferences
     description: "Staging of `Preferences`. Service-level preference, belongs to a business domain."
@@ -437,9 +414,6 @@ models:
               config:
                 where: "locked_discount_type is not null"
 
-  # ---------------------------------------------------------------------------
-  # RIDES & HISTORY
-  # ---------------------------------------------------------------------------
 
   - name: stg_rides
     description: "Staging of `Rides`. One row per requested ride (any status)."
@@ -522,10 +496,6 @@ models:
               to: ref('stg_rides')
               field: ride_id
 
-  # ---------------------------------------------------------------------------
-  # PROMO REDEMPTIONS & PAYMENTS
-  # ---------------------------------------------------------------------------
-
   - name: stg_promo_code_redemptions
     description: "Staging of `PromoCodeRedemptions`. One row per promo redemption per ride."
     columns:
@@ -587,13 +557,14 @@ models:
               field: redemption_id
               config:
                 where: "promo_code_redemption_id is not null"
-      - name: subscription_id
+      - name: user_subscription_id
+        description: "FK to UserSubscriptions.UserSubscriptionId (subscription payment only)."
         data_tests:
           - relationships:
               to: ref('stg_user_subscriptions')
               field: user_subscription_id
               config:
-                where: "subscription_id is not null"
+                where: "user_subscription_id is not null"
       - name: status
         data_tests:
           - accepted_values:

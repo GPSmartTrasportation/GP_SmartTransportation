@@ -1,0 +1,485 @@
+version: 2
+
+models:
+
+  - name: int_zones_enriched
+    description: >
+      One row per zone, flattened with its city and governorate. Use this
+      instead of joining stg_zones → stg_cities → stg_governorates every time.
+    columns:
+      - name: zone_id
+        description: "Primary key. FK to stg_zones.zone_id."
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_zones')
+              field: zone_id
+      - name: zone_name_en
+        data_tests:
+          - not_null
+      - name: is_zone_active
+        data_type: boolean
+        description: >
+          Boolean for BI (True/False in Power BI). true = zone active,
+          false = zone not active. SQL Server stores as bit (1/0).
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: city_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_cities')
+              field: city_id
+      - name: city_name_en
+        data_tests:
+          - not_null
+      - name: governorate_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_governorates')
+              field: governorate_id
+      - name: governorate_name_en
+        # Not required to be non-null in source; leave untested.
+
+  - name: int_ride_status_events
+    description: >
+      One row per ride. Pivots status history into requested/accepted/completed/cancelled timestamps.
+    columns:
+      - name: ride_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_rides')
+              field: ride_id
+      - name: cancellation_reason_id
+        data_tests:
+          - relationships:
+              to: ref('stg_cancellation_reasons')
+              field: cancellation_reason_id
+              config:
+                where: "cancellation_reason_id is not null"
+      - name: status_change_count
+        data_tests:
+          - not_null
+
+  - name: int_rides_enriched
+    description: >
+      Fact prep for FACT_RIDES (1 row per ride). Join int_ride_payments_rollup in gold for money.
+      Degenerate: ride_id, session_id (driver shift id — not FK to fct_sessions).
+      Dimension FKs in gold: user_id, driver_id, vehicle_id, preference_id, zone ids, date keys.
+    columns:
+      - name: ride_id
+        description: "Degenerate dimension (PaymentId-style UK on fact)."
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_rides')
+              field: ride_id
+      - name: session_id
+        description: >
+          Degenerate dimension: driver shift id (OLTP Sessions). Not a FK to fct_sessions.
+      - name: user_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_users')
+              field: user_id
+      - name: session_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_sessions')
+              field: session_id
+      - name: driver_id
+        data_tests:
+          - relationships:
+              to: ref('stg_drivers')
+              field: driver_id
+              config:
+                where: "driver_id is not null"
+      - name: pickup_zone_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('int_zones_enriched')
+              field: zone_id
+      - name: dropoff_zone_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('int_zones_enriched')
+              field: zone_id
+      - name: current_status
+        data_tests:
+          - accepted_values:
+              values: ['Requested', 'Accepted', 'Completed', 'Cancelled']
+              config:
+                where: "current_status is not null"
+      - name: is_completed
+        data_type: boolean
+        description: "true when ride current_status is Completed."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: is_cancelled
+        data_type: boolean
+        description: "true when ride current_status is Cancelled."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: is_intra_zone
+        data_type: boolean
+        description: "true when pickup_zone_id equals dropoff_zone_id."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: is_intra_city
+        data_type: boolean
+        description: "true when pickup and dropoff cities match."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: is_intra_governorate
+        data_type: boolean
+        description: "true when pickup and dropoff governorates match."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+
+  - name: int_payments_enriched
+    description: >
+      Fact prep for FACT_PAYMENTS (1 row per payment). Measure is amount only; ride
+      economics (driver earning, commission, discounts) are on int_ride_payments_rollup
+      for FACT_RIDES. Degenerate: payment_id, ride_id, promo_code_redemption_id,
+      user_subscription_id (from stg_payments, same id as stg_user_subscriptions).
+    columns:
+      - name: payment_id
+        description: "Degenerate dimension (UK)."
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_payments')
+              field: payment_id
+      - name: user_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_users')
+              field: user_id
+      - name: ride_id
+        description: "Degenerate; nullable for non-ride payments."
+        data_tests:
+          - relationships:
+              to: ref('stg_rides')
+              field: ride_id
+              config:
+                where: "ride_id is not null"
+      - name: promo_code_redemption_id
+        description: "Degenerate; links to redemption by id, not fct_promo_code_redemptions."
+        data_tests:
+          - relationships:
+              to: ref('stg_promo_code_redemptions')
+              field: redemption_id
+              config:
+                where: "promo_code_redemption_id is not null"
+      - name: user_subscription_id
+        description: "Degenerate; links to subscription by id, not fct_user_subscriptions."
+        data_tests:
+          - relationships:
+              to: ref('stg_user_subscriptions')
+              field: user_subscription_id
+              config:
+                where: "user_subscription_id is not null"
+      - name: status
+        data_tests:
+          - accepted_values:
+              values: ['Pending', 'Completed', 'Failed', 'Refunded']
+              config:
+                where: "status is not null"
+      - name: is_refund
+        data_type: boolean
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+
+  - name: int_promo_code_redemptions_enriched
+    description: >
+      Fact prep for FACT_PROMO_CODE_REDEMPTIONS. Degenerate: redemption_id, ride_id.
+      Gold: PromoCodeKey, UserKey, RedeemedDateKey (no RideKey FK to fct_rides).
+    columns:
+      - name: redemption_id
+        description: "Degenerate dimension (UK)."
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_promo_code_redemptions')
+              field: redemption_id
+      - name: promo_code_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_promo_codes')
+              field: promo_code_id
+      - name: user_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_users')
+              field: user_id
+      - name: ride_id
+        description: "Degenerate; not FK to fct_rides."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_rides')
+              field: ride_id
+      - name: discount_amount_applied
+        data_tests:
+          - not_null
+      - name: redeemed_at
+        data_tests:
+          - not_null
+
+  - name: int_ride_payments_rollup
+    description: >
+      One row per ride with payment aggregates. Amount excludes refund rows;
+      RefundAmount is separate; NetRevenue subtracts refunds and discounts.
+    columns:
+      - name: ride_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_rides')
+              field: ride_id
+      - name: amount
+        description: "Sum of payment amounts where is_refund = 0."
+      - name: refund_amount
+        description: "Sum of absolute refund payment amounts."
+      - name: net_revenue
+        description: "amount - refund_amount - subscription_discount - promo_discount."
+
+  - name: int_ride_ratings_attribution
+    description: >
+      Fact prep for FACT_RIDE_RATINGS. Rater/rated from Rides.UserId and Sessions.DriverId
+      by RaterRole (same logic as OLTP). Includes rater_full_name / rated_full_name for BI;
+      gold still uses rater_user_id / rated_user_id → dim_user.
+    columns:
+      - name: rating_id
+        description: "Degenerate dimension (UK)."
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_ride_ratings')
+              field: rating_id
+      - name: ride_id
+        description: "Degenerate; not FK to fct_rides."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_rides')
+              field: ride_id
+      - name: rater_user_id
+        description: "Passenger rater → ride user_id; Driver rater → session driver_id."
+        data_tests:
+          - relationships:
+              to: ref('stg_users')
+              field: user_id
+              config:
+                where: "rater_user_id is not null"
+      - name: rater_full_name
+        description: "Display name of rater (Passenger or Driver on the ride)."
+      - name: rated_user_id
+        description: "Passenger rated → driver_id; Driver rated → ride user_id."
+        data_tests:
+          - relationships:
+              to: ref('stg_users')
+              field: user_id
+              config:
+                where: "rated_user_id is not null"
+      - name: rated_full_name
+        description: "Display name of rated user (the other party on the ride)."
+      - name: rater_role
+        data_tests:
+          - accepted_values:
+              values: ['Passenger', 'Driver']
+              config:
+                where: "rater_role is not null"
+
+  - name: int_users_enriched
+    description: >
+      One row per user with UserRole (Passenger / Driver / Both) and wallet balance.
+      Facebook empty strings are normalized to null; facebook_id nulls are kept as null.
+    columns:
+      - name: user_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_users')
+              field: user_id
+      - name: user_role
+        data_tests:
+          - accepted_values:
+              values: ['Passenger', 'Driver', 'Both']
+              config:
+                where: "user_role is not null"
+
+  - name: int_driver_license_current
+    description: >
+      One row per driver — current license (valid-first, else latest by expiry).
+    columns:
+      - name: driver_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_drivers')
+              field: driver_id
+      - name: license_number
+        data_tests:
+          - not_null
+      - name: expiry_date
+        data_tests:
+          - not_null
+      - name: is_license_valid
+        data_type: boolean
+        description: "true when current license expiry_date is on or after today."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+
+  - name: int_driver_background_check_current
+    description: >
+      One row per driver — current background check (valid Passed-first, else latest).
+    columns:
+      - name: driver_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_drivers')
+              field: driver_id
+      - name: is_background_check_valid
+        data_type: boolean
+        description: "true when latest check Passed and expiry_date is on or after today."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+
+  - name: int_drivers_enriched
+    description: >
+      One row per driver with user profile and current license / background check attributes.
+    columns:
+      - name: driver_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_drivers')
+              field: driver_id
+      - name: full_name_en
+        data_tests:
+          - not_null
+      - name: is_license_valid
+        data_type: boolean
+        description: "From int_driver_license_current."
+      - name: is_background_check_valid
+        data_type: boolean
+        description: "From int_driver_background_check_current."
+
+  - name: int_sessions_enriched
+    description: >
+      Fact prep for FACT_SESSIONS (driver shift grain). Shift timing from stg_sessions;
+      ride_count, completed_ride_count, total_revenue aggregated from int_rides_enriched
+      and int_ride_payments_rollup. Shifts with no rides get 0 for measure columns.
+    columns:
+      - name: session_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_sessions')
+              field: session_id
+      - name: driver_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_drivers')
+              field: driver_id
+      - name: is_currently_online
+        data_type: boolean
+        description: "true when session has no offline_at (driver still online)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: ride_count
+        description: "Number of rides in this shift (session)."
+        data_tests:
+          - not_null
+      - name: completed_ride_count
+        description: "Rides in shift where is_completed = 1."
+        data_tests:
+          - not_null
+      - name: total_revenue
+        description: "Sum of net_revenue from int_ride_payments_rollup for rides in shift."
+        data_tests:
+          - not_null
+
+  - name: int_user_subscriptions_enriched
+    description: >
+      Fact prep for FACT_USER_SUBSCRIPTIONS. Subscription grain only; plan catalog
+      attributes belong on dim_subscription_plan (join via plan_id in gold). Locked_* columns
+      are fact snapshots, not current plan catalog.
+    columns:
+      - name: user_subscription_id
+        description: "Degenerate dimension (UK on subscription fact)."
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_user_subscriptions')
+              field: user_subscription_id
+      - name: user_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_users')
+              field: user_id
+      - name: plan_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_subscription_plans')
+              field: plan_id
+      - name: auto_renew
+        data_type: boolean
+        description: "From OLTP UserSubscriptions.AutoRenew."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: status
+        data_tests:
+          - accepted_values:
+              values: ['Active', 'Expired', 'Cancelled']
+              config:
+                where: "status is not null"

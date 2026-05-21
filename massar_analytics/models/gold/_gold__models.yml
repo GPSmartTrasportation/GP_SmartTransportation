@@ -1,0 +1,243 @@
+version: 2
+
+# Gold layer: marts schema (tables). 10 dimensions + 6 facts.
+
+models:
+
+  - name: dim_date
+    description: >
+      Calendar dimension (2024-2026). Egypt weekend Fri-Sat. occasion is plain text per day.
+    columns:
+      - name: date_key
+        data_tests:
+          - unique
+          - not_null
+      - name: is_weekend
+        description: "1 = Friday or Saturday (Egypt weekend)."
+      - name: occasion
+        description: >
+          Readable label for the date: Ramadan, Eid al-Fitr, Eid al-Adha, or Regular Day.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values:
+                - 'Regular Day'
+                - 'Ramadan'
+                - 'Eid al-Fitr'
+                - 'Eid al-Adha'
+
+  - name: dim_time
+    description: >
+      Time-of-day dimension (1440 rows, minute grain, no seconds). time_key is HHMM (e.g. 1430).
+      period_of_day and is_peak_hour support peak-hour analysis in Power BI.
+    columns:
+      - name: time_key
+        description: "Integer HHMM; joins to *_time_key on facts."
+        data_tests:
+          - unique
+          - not_null
+      - name: period_of_day
+        description: >
+          Readable bucket: Late Night, Morning Rush, Morning, Lunch, Afternoon, Evening Rush, Night.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values:
+                - 'Late Night'
+                - 'Morning Rush'
+                - 'Morning'
+                - 'Lunch'
+                - 'Afternoon'
+                - 'Evening Rush'
+                - 'Night'
+      - name: is_peak_hour
+        description: "1 during morning (7-9), lunch (12-14), or evening (17-20) peaks."
+
+  - name: dim_user
+    columns:
+      - name: user_key
+        data_tests:
+          - unique
+          - not_null
+      - name: user_id
+        data_tests:
+          - unique
+          - not_null
+
+  - name: dim_driver
+    columns:
+      - name: driver_key
+        data_tests:
+          - unique
+          - not_null
+      - name: driver_id
+        data_tests:
+          - unique
+          - not_null
+
+  - name: dim_vehicle
+    columns:
+      - name: vehicle_key
+        data_tests:
+          - unique
+          - not_null
+      - name: vehicle_id
+        data_tests:
+          - unique
+          - not_null
+
+  - name: dim_preference
+    columns:
+      - name: preference_key
+        data_tests:
+          - unique
+          - not_null
+
+  - name: dim_geography
+    columns:
+      - name: zone_key
+        data_tests:
+          - unique
+          - not_null
+      - name: zone_id
+        data_tests:
+          - unique
+          - not_null
+
+  - name: dim_subscription_plan
+    columns:
+      - name: plan_key
+        data_tests:
+          - unique
+          - not_null
+
+  - name: dim_promo_code
+    columns:
+      - name: promo_code_key
+        data_tests:
+          - unique
+          - not_null
+
+  - name: dim_cancellation_reason
+    columns:
+      - name: cancellation_reason_key
+        data_tests:
+          - unique
+          - not_null
+
+  - name: fact_sessions
+    description: >
+      Driver shift fact (grain = one row per session). session_key is surrogate PK;
+      session_id is the operational natural key. fact_rides.session_id is a degenerate
+      dimension (same shift id) — not a FK to this fact.
+    columns:
+      - name: session_key
+        data_tests:
+          - unique
+          - not_null
+      - name: session_id
+        description: "Natural key (OLTP Sessions); unique at this fact grain."
+        data_tests:
+          - unique
+          - not_null
+
+  - name: fact_rides
+    description: >
+      Ride fact (grain = one row per ride). ride_key is surrogate PK. Dimension keys
+      join dims; degenerate columns keep OLTP ids without fact-to-fact FKs.
+      requested_time_key joins dim_time for peak-hour analysis.
+    columns:
+      - name: ride_key
+        data_tests:
+          - unique
+          - not_null
+      - name: ride_id
+        description: "Degenerate dimension — operational ride id (UK at this grain)."
+        data_tests:
+          - unique
+          - not_null
+      - name: session_id
+        description: >
+          Degenerate dimension — driver shift id (OLTP Sessions). Not a FK to fact_sessions.
+        data_tests:
+          - not_null
+      - name: requested_time_key
+        description: "HHMM from requested_at (no seconds). Relates to dim_time.time_key."
+
+  - name: fact_payments
+    description: >
+      Payment fact (grain = one row per payment). payment_key is surrogate PK.
+      ride_id, promo_code_redemption_id, and user_subscription_id are degenerate —
+      same OLTP ids, no FKs to other facts.
+    columns:
+      - name: payment_key
+        data_tests:
+          - unique
+          - not_null
+      - name: payment_id
+        description: "Degenerate dimension — operational payment id (UK at this grain)."
+        data_tests:
+          - unique
+          - not_null
+      - name: ride_id
+        description: "Degenerate dimension — nullable when payment is not tied to a ride."
+      - name: promo_code_redemption_id
+        description: >
+          Degenerate dimension — OLTP redemption id. Not a FK to fact_promo_code_redemptions.
+      - name: user_subscription_id
+        description: >
+          Degenerate dimension — OLTP subscription id. Not a FK to fact_user_subscriptions.
+
+  - name: fact_ride_ratings
+    description: >
+      Rating fact (grain = one row per rating). rating_key is surrogate PK.
+      ride_id is degenerate — links to rides by id, not a FK to fact_rides.
+    columns:
+      - name: rating_key
+        data_tests:
+          - unique
+          - not_null
+      - name: rating_id
+        description: "Degenerate dimension — operational rating id (UK at this grain)."
+        data_tests:
+          - unique
+          - not_null
+      - name: ride_id
+        description: "Degenerate dimension — OLTP ride id. Not a FK to fact_rides."
+        data_tests:
+          - not_null
+
+  - name: fact_user_subscriptions
+    description: >
+      Subscription fact (grain = one row per subscription). user_subscription_key is
+      surrogate PK; user_subscription_id is the operational natural key (same role as
+      degenerate UK on this fact).
+    columns:
+      - name: user_subscription_key
+        data_tests:
+          - unique
+          - not_null
+      - name: user_subscription_id
+        description: "Degenerate dimension — operational subscription id (UK at this grain)."
+        data_tests:
+          - unique
+          - not_null
+
+  - name: fact_promo_code_redemptions
+    description: >
+      Promo redemption fact (grain = one row per redemption). redemption_key is surrogate PK.
+      ride_id is degenerate — OLTP ride id, not a FK to fact_rides.
+    columns:
+      - name: redemption_key
+        data_tests:
+          - unique
+          - not_null
+      - name: redemption_id
+        description: "Degenerate dimension — operational redemption id (UK at this grain)."
+        data_tests:
+          - unique
+          - not_null
+      - name: ride_id
+        description: "Degenerate dimension — OLTP ride id. Not a FK to fact_rides."
+        data_tests:
+          - not_null
