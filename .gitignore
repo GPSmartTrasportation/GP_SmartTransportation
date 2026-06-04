@@ -53,3 +53,11 @@ temp/
 *.env
 secrets/
 ConnectionStrings.config
+
+# SSRS/VS ignore
+.vs/
+*.user
+*.suo
+bin/
+obj/
+*.rdl.data
