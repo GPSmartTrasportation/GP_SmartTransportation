@@ -5,7 +5,7 @@
     <BuildType Name="Release" />
     <Platform Name="Default" />
   </Configurations>
-  <Project Path="Massar_Reports.rptproj">
+  <Project Path="SSRS_Massar_Reports.rptproj">
     <Deploy Solution="Debug|*" />
     <Deploy Solution="Release|*" />
   </Project>
