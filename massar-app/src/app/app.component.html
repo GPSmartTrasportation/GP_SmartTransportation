@@ -1,0 +1,41 @@
+<app-navbar
+  [activeTab]="activeTab"
+  (tabChange)="activeTab=$event">
+</app-navbar>
+
+<div class="app-layout">
+
+  <!-- ===== BOOK RIDE LAYOUT (two panels) ===== -->
+  <ng-container *ngIf="activeTab === 'book'">
+    <div class="left-panel">
+      <app-book-ride
+        (pickupChanged)="mapPickup=$event"
+        (dropoffChanged)="mapDropoff=$event"
+        (stepChanged)="currentStep=$event">
+      </app-book-ride>
+    </div>
+    <div class="right-panel">
+      <app-map-panel
+        [pickup]="mapPickup"
+        [dropoff]="mapDropoff"
+        [step]="currentStep">
+      </app-map-panel>
+    </div>
+  </ng-container>
+
+  <!-- ===== MY TRIPS LAYOUT (full width) ===== -->
+  <div class="full-panel" *ngIf="activeTab === 'trips'">
+    <app-my-trips></app-my-trips>
+  </div>
+
+  <!-- ===== ACCOUNT LAYOUT (full width) ===== -->
+  <div class="full-panel" *ngIf="activeTab === 'account'">
+    <app-account></app-account>
+  </div>
+
+</div>
+
+<app-bottom-nav
+  [active]="activeTab"
+  (tabChange)="activeTab=$event">
+</app-bottom-nav>

@@ -1,0 +1,19 @@
+<div class="map-container">
+  <div class="map-overlay-label">
+    <span class="material-icons" style="font-size:14px">map</span>
+    {{ statusLabel }}
+  </div>
+
+  <div #mapHost class="leaflet-map"></div>
+
+  <div class="map-legend" *ngIf="hasRoute">
+    <div class="legend-item">
+      <span class="legend-dot pickup"></span>
+      <span>{{ pickup?.cityName }} — {{ pickup?.name }}</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot dropoff"></span>
+      <span>{{ dropoff?.cityName }} — {{ dropoff?.name }}</span>
+    </div>
+  </div>
+</div>

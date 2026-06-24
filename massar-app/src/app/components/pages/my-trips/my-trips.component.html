@@ -1,0 +1,101 @@
+<div class="trips-panel" *ngIf="!selectedRide">
+  <div class="panel-header">
+    <h2>My Trips</h2>
+    <p>{{ data.rideHistory.length }} total rides</p>
+  </div>
+
+  <!-- Filter tabs -->
+  <div class="filter-tabs">
+    <button class="filter-btn" [class.active]="filterStatus==='all'" (click)="filterStatus='all'">All</button>
+    <button class="filter-btn" [class.active]="filterStatus==='completed'" (click)="filterStatus='completed'">Completed</button>
+    <button class="filter-btn" [class.active]="filterStatus==='cancelled'" (click)="filterStatus='cancelled'">Cancelled</button>
+    <button class="filter-btn" [class.active]="filterStatus==='in_progress'" (click)="filterStatus='in_progress'">In Progress</button>
+  </div>
+
+  <!-- Trip cards -->
+  <div class="trips-list">
+    <div class="trip-card" *ngFor="let ride of filteredRides" (click)="selectedRide=ride">
+      <div class="trip-card-header">
+        <div class="trip-date-status">
+          <span class="trip-date">{{ ride.date }}</span>
+          <span class="badge" [ngClass]="statusClass(ride.status)">
+            {{ statusLabel(ride.status) }}
+          </span>
+        </div>
+        <span class="trip-amount" *ngIf="ride.amount > 0">EGP {{ ride.amount.toFixed(2) }}</span>
+      </div>
+
+      <div class="trip-route">
+        <div class="trip-point">
+          <span class="rdot green"></span>
+          <span>{{ ride.pickupZone }}</span>
+        </div>
+        <div class="trip-arrow">→</div>
+        <div class="trip-point">
+          <span class="rdot orange"></span>
+          <span>{{ ride.dropoffZone }}</span>
+        </div>
+      </div>
+
+      <div class="trip-footer">
+        <span>🚗 {{ ride.vehicleType }}</span>
+        <span>👤 {{ ride.driverName !== '—' ? ride.driverName : 'N/A' }}</span>
+        <span>💳 {{ ride.paymentType }}</span>
+      </div>
+    </div>
+
+    <div class="empty-state" *ngIf="filteredRides.length === 0">
+      <span class="material-icons" style="font-size:48px;color:var(--text-muted)">history</span>
+      <p>No {{ filterStatus !== 'all' ? filterStatus : '' }} trips found</p>
+    </div>
+  </div>
+</div>
+
+<!-- Trip Detail -->
+<div class="trip-detail fade-in" *ngIf="selectedRide">
+  <div class="detail-header">
+    <button class="btn btn-ghost btn-sm" (click)="selectedRide=null">
+      <span class="material-icons">arrow_back</span> Back
+    </button>
+    <h3>Trip Details</h3>
+  </div>
+
+  <div class="detail-hero">
+    <span class="badge badge-lg" [ngClass]="statusClass(selectedRide.status)">{{ statusLabel(selectedRide.status) }}</span>
+    <p class="detail-date">{{ selectedRide.date }}</p>
+    <p class="detail-ref">{{ selectedRide.rideRef }}</p>
+  </div>
+
+  <div class="detail-card">
+    <div class="route-point">
+      <span class="rdot green"></span>
+      <div>
+        <p class="route-label">Pickup</p>
+        <p class="route-value">{{ selectedRide.pickupZone }}</p>
+      </div>
+    </div>
+    <div style="width:2px;height:20px;background:var(--border);margin-left:4px;"></div>
+    <div class="route-point">
+      <span class="rdot orange"></span>
+      <div>
+        <p class="route-label">Drop-off</p>
+        <p class="route-value">{{ selectedRide.dropoffZone }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-card">
+    <div class="detail-row"><span>Driver</span><span>{{ selectedRide.driverName }}</span></div>
+    <div class="detail-row"><span>Vehicle</span><span>{{ selectedRide.vehicleType }}</span></div>
+    <div class="detail-row" *ngIf="selectedRide.distance > 0">
+      <span>Distance</span><span>{{ selectedRide.distance }} km</span>
+    </div>
+    <div class="detail-row" *ngIf="selectedRide.duration > 0">
+      <span>Duration</span><span>{{ selectedRide.duration }} min</span>
+    </div>
+    <div class="detail-row"><span>Payment</span><span>{{ selectedRide.paymentType }}</span></div>
+    <div class="detail-row total" *ngIf="selectedRide.amount > 0">
+      <span>Total Paid</span><span>EGP {{ selectedRide.amount.toFixed(2) }}</span>
+    </div>
+  </div>
+</div>

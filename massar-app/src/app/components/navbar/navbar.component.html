@@ -1,0 +1,32 @@
+<nav class="navbar">
+  <div class="navbar-brand" (click)="tabChange.emit('book')">
+    <!-- Massar SVG Logo -->
+    <!-- <svg width="36" height="36" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" rx="16" fill="#1a2744"/>
+      <path d="M20 75 L35 30 L50 60 L65 30 L80 75" stroke="#4a9d8f" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <circle cx="50" cy="60" r="5" fill="#4a9d8f"/>
+    </svg>
+    <span class="brand-name">MASSAR</span> -->
+    <img src="assets/logo.png" style="width: 140px;">
+  </div>
+
+  <div class="navbar-links">
+    <button class="nav-link" [class.active]="activeTab === 'book'" (click)="tabChange.emit('book')">
+      <span class="material-icons">directions_car</span> Ride
+    </button>
+    <button class="nav-link" [class.active]="activeTab === 'trips'" (click)="tabChange.emit('trips')">
+      <span class="material-icons">history</span> My Trips
+    </button>
+    <button class="nav-link" [class.active]="activeTab === 'account'" (click)="tabChange.emit('account')">
+      <span class="material-icons">person</span> Account
+    </button>
+    <button class="nav-link">
+      <span class="material-icons">help_outline</span> Help
+    </button>
+  </div>
+
+  <div class="navbar-actions">
+    <button class="btn btn-ghost btn-sm">Log in</button>
+    <button class="btn btn-primary btn-sm">Sign up</button>
+  </div>
+</nav>

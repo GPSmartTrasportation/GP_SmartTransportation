@@ -1,0 +1,495 @@
+<!-- ======== STEP 1: BOOKING FORM ======== -->
+<div class="panel-scroll" *ngIf="step === 'booking'">
+
+  <!-- Greeting -->
+  <div class="greeting-bar">
+    <div>
+      <p class="greeting-text">Hello, {{ data.currentUser.name.split(' ')[0] }} 👋</p>
+      <p class="greeting-sub">Where are you going today?</p>
+    </div>
+    <div class="wallet-chip">
+      <span class="material-icons" style="font-size:14px;color:var(--teal)">account_balance_wallet</span>
+      EGP {{ data.currentUser.walletBalance.toFixed(2) }}
+    </div>
+  </div>
+
+  <!-- Subscription badge -->
+  <div class="sub-badge" *ngIf="data.currentUser.subscription">
+    <span class="material-icons" style="font-size:13px">workspace_premium</span>
+    {{ data.currentUser.subscription.planName }} Plan — {{ data.currentUser.subscription.discountPercent }}% discount active
+  </div>
+
+  <!-- Location Section -->
+  <div class="section-card">
+    <h3 class="section-title">
+      <span class="material-icons" style="font-size:16px">place</span>
+      Trip Locations
+    </h3>
+
+    <div class="location-stack">
+      <!-- Pickup -->
+      <div class="location-field">
+        <div class="location-dot green"></div>
+        <div class="form-group flex-1">
+          <label class="form-label">Pickup Location</label>
+          <div class="select-wrapper">
+            <select class="form-control" (change)="onPickupChange($event)" [value]="form.pickupZoneId ?? ''">
+              <option value="">Select pickup zone...</option>
+              <optgroup *ngFor="let gov of data.governorates" [label]="gov">
+                <option *ngFor="let z of filteredPickupZones | zonesByGov: gov" [value]="z.id">
+                  {{ z.cityName }} — {{ z.name }}
+                </option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="location-connector">
+        <div class="connector-line"></div>
+        <button class="swap-btn" title="Swap locations" (click)="swapLocations()">
+          <span class="material-icons">swap_vert</span>
+        </button>
+      </div>
+
+      <!-- Dropoff -->
+      <div class="location-field">
+        <div class="location-dot orange"></div>
+        <div class="form-group flex-1">
+          <label class="form-label">Drop-off Location</label>
+          <div class="select-wrapper">
+            <select class="form-control" (change)="onDropoffChange($event)" [value]="form.dropoffZoneId ?? ''">
+              <option value="">Select drop-off zone...</option>
+              <optgroup *ngFor="let gov of data.governorates" [label]="gov">
+                <option *ngFor="let z of filteredDropoffZones | zonesByGov: gov" [value]="z.id">
+                  {{ z.cityName }} — {{ z.name }}
+                </option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trip Type -->
+  <div class="section-card">
+    <h3 class="section-title">
+      <span class="material-icons" style="font-size:16px">category</span>
+      Trip Details
+    </h3>
+
+    <div class="form-group">
+      <label class="form-label">Trip Type</label>
+      <div class="trip-type-toggle">
+        <button class="type-btn" [class.active]="form.tripType==='passenger'" (click)="form.tripType='passenger'">
+          <span class="material-icons">person</span> Passenger
+        </button>
+        <button class="type-btn" [class.active]="form.tripType==='cargo'" (click)="form.tripType='cargo'">
+          <span class="material-icons">inventory_2</span> Cargo
+        </button>
+      </div>
+    </div>
+
+    <!-- Passenger count -->
+    <div class="form-group" *ngIf="form.tripType==='passenger'">
+      <label class="form-label">Passengers</label>
+      <div class="count-selector">
+        <button *ngFor="let n of passengerCounts"
+          class="count-btn"
+          [class.active]="form.passengerCount===n"
+          (click)="form.passengerCount=n">{{ n }}</button>
+      </div>
+    </div>
+
+    <!-- Cargo fields -->
+    <ng-container *ngIf="form.tripType==='cargo'">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Cargo Type</label>
+          <div class="select-wrapper">
+            <select class="form-control" [(ngModel)]="form.cargoType">
+              <option value="">Select type...</option>
+              <option *ngFor="let ct of cargoTypes" [value]="ct">{{ ct }}</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Weight (kg)</label>
+          <input class="form-control" type="number" [(ngModel)]="form.cargoWeight" placeholder="e.g. 50" min="1"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Receiver Name</label>
+          <input class="form-control" type="text" [(ngModel)]="form.receiverName" placeholder="Full name"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Receiver Phone</label>
+          <input class="form-control" type="tel" [(ngModel)]="form.receiverPhone" placeholder="+20 1xx xxx xxxx"/>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+
+  <!-- Vehicle Type -->
+  <div class="section-card">
+    <h3 class="section-title">
+      <span class="material-icons" style="font-size:16px">directions_car</span>
+      Vehicle Type
+    </h3>
+    <div class="vehicle-grid">
+      <button *ngFor="let vt of vehicleTypes"
+        class="vehicle-card"
+        [class.active]="form.vehicleTypeId===vt.id"
+        [class.hidden-vehicle]="form.tripType==='passenger' && vt.name.includes('Truck')"
+        (click)="onVehicleSelect(vt.id)">
+        <span class="vehicle-icon">{{ vt.icon }}</span>
+        <span class="vehicle-name">{{ vt.name }}</span>
+        <span class="vehicle-multi">×{{ vt.baseMultiplier }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Pickup Time -->
+  <div class="section-card">
+    <h3 class="section-title">
+      <span class="material-icons" style="font-size:16px">schedule</span>
+      Pickup Time
+    </h3>
+    <div class="time-toggle">
+      <button class="type-btn" [class.active]="form.pickupTime==='now'" (click)="form.pickupTime='now'">
+        <span class="material-icons">flash_on</span> Now
+      </button>
+      <button class="type-btn" [class.active]="form.pickupTime==='scheduled'" (click)="form.pickupTime='scheduled'">
+        <span class="material-icons">calendar_today</span> Schedule
+      </button>
+    </div>
+    <div class="form-row mt-12" *ngIf="form.pickupTime==='scheduled'">
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input class="form-control" type="date" [(ngModel)]="form.scheduledDate"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Time</label>
+        <input class="form-control" type="time" [(ngModel)]="form.scheduledTime"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- Promo Code -->
+  <div class="section-card">
+    <h3 class="section-title">
+      <span class="material-icons" style="font-size:16px">local_offer</span>
+      Promo Code
+    </h3>
+    <div class="promo-row">
+      <input class="form-control" type="text" [(ngModel)]="form.promoCode"
+        placeholder="Enter promo code (e.g. SUMMER20)" style="text-transform:uppercase"/>
+    </div>
+    <p class="promo-hint">Try: SUMMER20 · MASSAR10 · WELCOME15</p>
+  </div>
+
+  <!-- CTA -->
+  <button class="btn btn-primary btn-lg btn-full calculate-btn"
+    [disabled]="!canCalculate"
+    (click)="calculateFare()">
+    <span class="material-icons">calculate</span>
+    Calculate Fare
+  </button>
+  <p class="cta-hint" *ngIf="!canCalculate">Please select pickup, drop-off, and vehicle type to continue</p>
+</div>
+
+
+<!-- ======== LOADING STATE ======== -->
+<div class="loading-state fade-in" *ngIf="isCalculating">
+  <div class="spinner"></div>
+  <p class="loading-text">Calculating your fare...</p>
+  <p class="loading-sub">Checking vehicle availability & discounts</p>
+</div>
+
+
+<!-- ======== STEP 2: FARE RESULT ======== -->
+<div class="panel-scroll fade-in" *ngIf="step === 'fare' && fareEstimate">
+  <div class="back-btn-row">
+    <button class="btn btn-ghost btn-sm" (click)="step='booking'; stepChanged.emit('booking')">
+      <span class="material-icons">arrow_back</span> Change Details
+    </button>
+  </div>
+
+  <div class="fare-hero">
+    <p class="fare-label">Estimated Fare</p>
+    <p class="fare-amount">EGP {{ fareEstimate.total.toFixed(2) }}</p>
+    <div class="fare-meta">
+      <span><span class="material-icons" style="font-size:13px">straighten</span> {{ fareEstimate.distance }} km</span>
+      <span class="dot">·</span>
+      <span><span class="material-icons" style="font-size:13px">schedule</span> ~{{ fareEstimate.duration }} min</span>
+    </div>
+  </div>
+
+  <!-- Fare breakdown -->
+  <div class="section-card">
+    <h3 class="section-title">Fare Breakdown</h3>
+    <div class="breakdown-row">
+      <span>Base Fare</span><span>EGP {{ fareEstimate.baseFare.toFixed(2) }}</span>
+    </div>
+    <div class="breakdown-row">
+      <span>Distance ({{ fareEstimate.distance }} km × EGP 7)</span>
+      <span>EGP {{ fareEstimate.distanceFare.toFixed(2) }}</span>
+    </div>
+    <div class="breakdown-row">
+      <span>Vehicle multiplier (×{{ fareEstimate.vehicleMultiplier }})</span>
+      <span>EGP {{ fareEstimate.subtotal.toFixed(2) }}</span>
+    </div>
+    <div class="divider"></div>
+    <div class="breakdown-row discount" *ngIf="fareEstimate.promoDiscount > 0">
+      <span>🎁 Promo ({{ fareEstimate.promoCode }})</span>
+      <span>−EGP {{ fareEstimate.promoDiscount.toFixed(2) }}</span>
+    </div>
+    <div class="breakdown-row discount" *ngIf="fareEstimate.subscriptionDiscount > 0">
+      <span>⭐ Gold Subscription ({{ data.currentUser.subscription?.discountPercent }}%)</span>
+      <span>−EGP {{ fareEstimate.subscriptionDiscount.toFixed(2) }}</span>
+    </div>
+    <div class="divider"></div>
+    <div class="breakdown-row total">
+      <span>Total</span><span>EGP {{ fareEstimate.total.toFixed(2) }}</span>
+    </div>
+  </div>
+
+  <!-- Route summary -->
+  <div class="section-card route-summary">
+    <div class="route-point">
+      <span class="rdot green"></span>
+      <div>
+        <p class="route-label">Pickup</p>
+        <p class="route-value">{{ data.getZoneLabel(pickupZone!) }}</p>
+      </div>
+    </div>
+    <div class="route-line-v"></div>
+    <div class="route-point">
+      <span class="rdot orange"></span>
+      <div>
+        <p class="route-label">Drop-off</p>
+        <p class="route-value">{{ data.getZoneLabel(dropoffZone!) }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Driver card -->
+  <div class="section-card driver-card">
+    <div class="driver-card-header">
+      <div class="driver-avatar">{{ fareEstimate.suggestedDriver.avatar }}</div>
+      <div class="driver-info">
+        <p class="driver-name">{{ fareEstimate.suggestedDriver.name }}</p>
+        <div class="driver-rating">
+          <span class="stars">★★★★★</span>
+          <span class="rating-val">{{ fareEstimate.suggestedDriver.rating }}</span>
+          <span class="rating-count">({{ fareEstimate.suggestedDriver.totalRatings }})</span>
+        </div>
+      </div>
+      <div class="arrival-badge">
+        <span class="material-icons" style="font-size:14px">timer</span>
+        {{ fareEstimate.suggestedDriver.arrivalMinutes }} min away
+      </div>
+    </div>
+    <div class="driver-vehicle-info">
+      <span>🚗 {{ fareEstimate.suggestedDriver.vehicleBrand }} {{ fareEstimate.suggestedDriver.vehicleModel }}</span>
+      <span class="badge badge-info">{{ fareEstimate.suggestedDriver.vehicleType }}</span>
+      <span class="plate">{{ fareEstimate.suggestedDriver.licensePlate }}</span>
+    </div>
+  </div>
+
+  <button class="btn btn-primary btn-lg btn-full" (click)="confirmRide()">
+    <span class="material-icons">check_circle</span>
+    Confirm Ride
+  </button>
+</div>
+
+
+<!-- ======== STEP 3: SEARCHING ======== -->
+<div class="panel-scroll fade-in" *ngIf="step === 'searching'">
+  <div class="status-hero searching">
+    <div class="search-animation">
+      <div class="search-ring r1"></div>
+      <div class="search-ring r2"></div>
+      <div class="search-ring r3"></div>
+      <span class="material-icons search-icon">directions_car</span>
+    </div>
+    <h2>Searching for a driver…</h2>
+    <p class="status-sub">We're matching you with the nearest available driver</p>
+    <div class="ride-ref-chip">Ride {{ rideRef }}</div>
+  </div>
+
+  <div class="section-card">
+    <div class="route-mini">
+      <div class="rm-item">
+        <span class="rdot green"></span>
+        <div>
+          <p class="rm-label">From</p>
+          <p class="rm-val">{{ data.getZoneLabel(pickupZone!) }}</p>
+        </div>
+      </div>
+      <div class="rm-divider"></div>
+      <div class="rm-item">
+        <span class="rdot orange"></span>
+        <div>
+          <p class="rm-label">To</p>
+          <p class="rm-val">{{ data.getZoneLabel(dropoffZone!) }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn btn-danger btn-full" (click)="cancelRide()">
+    <span class="material-icons">cancel</span>
+    Cancel Ride
+  </button>
+</div>
+
+
+<!-- ======== STEP 4: DRIVER ON WAY ======== -->
+<div class="panel-scroll fade-in" *ngIf="step === 'driver_on_way' && fareEstimate">
+  <div class="status-chip on-way">
+    <span class="material-icons">directions_car</span>
+    Driver is on the way
+  </div>
+
+  <div class="section-card driver-card">
+    <div class="driver-card-header">
+      <div class="driver-avatar">{{ fareEstimate.suggestedDriver.avatar }}</div>
+      <div class="driver-info">
+        <p class="driver-name">{{ fareEstimate.suggestedDriver.name }}</p>
+        <div class="driver-rating">
+          <span class="stars">★★★★★</span>
+          <span class="rating-val">{{ fareEstimate.suggestedDriver.rating }}</span>
+        </div>
+      </div>
+      <div class="arrival-badge">
+        <span class="material-icons" style="font-size:14px">timer</span>
+        {{ fareEstimate.suggestedDriver.arrivalMinutes }} min
+      </div>
+    </div>
+    <div class="driver-vehicle-info">
+      <span>🚗 {{ fareEstimate.suggestedDriver.vehicleBrand }} {{ fareEstimate.suggestedDriver.vehicleModel }}</span>
+      <span class="badge badge-info">{{ fareEstimate.suggestedDriver.vehicleType }}</span>
+      <span class="plate">{{ fareEstimate.suggestedDriver.licensePlate }}</span>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="info-row">
+      <span class="info-label">Estimated Fare</span>
+      <span class="info-val">EGP {{ fareEstimate.total.toFixed(2) }}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Distance</span>
+      <span class="info-val">{{ fareEstimate.distance }} km</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Duration</span>
+      <span class="info-val">~{{ fareEstimate.duration }} min</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Ride ID</span>
+      <span class="info-val">{{ rideRef }}</span>
+    </div>
+  </div>
+
+  <div class="action-row">
+    <button class="btn btn-outline btn-full">
+      <span class="material-icons">phone</span> Call Driver
+    </button>
+    <button class="btn btn-danger btn-full" (click)="cancelRide()">
+      <span class="material-icons">cancel</span> Cancel
+    </button>
+  </div>
+</div>
+
+
+<!-- ======== STEP 5: COMPLETED ======== -->
+<div class="panel-scroll fade-in" *ngIf="step === 'completed' && fareEstimate">
+  <div class="completed-hero" *ngIf="!ratingSubmitted">
+    <div class="completed-icon">✅</div>
+    <h2>Trip Completed!</h2>
+    <p>Thank you for riding with Massar</p>
+  </div>
+
+  <div class="success-animation" *ngIf="ratingSubmitted">
+    <div class="success-circle">🎉</div>
+    <h2>Rating Submitted!</h2>
+    <p>Returning to booking...</p>
+  </div>
+
+  <ng-container *ngIf="!ratingSubmitted">
+    <!-- Payment summary -->
+    <div class="section-card">
+      <h3 class="section-title">Payment Summary</h3>
+      <div class="breakdown-row">
+        <span>Fare</span><span>EGP {{ fareEstimate.subtotal.toFixed(2) }}</span>
+      </div>
+      <div class="breakdown-row discount" *ngIf="fareEstimate.subscriptionDiscount > 0">
+        <span>Gold Subscription</span>
+        <span>−EGP {{ fareEstimate.subscriptionDiscount.toFixed(2) }}</span>
+      </div>
+      <div class="breakdown-row discount" *ngIf="fareEstimate.promoDiscount > 0">
+        <span>Promo ({{ fareEstimate.promoCode }})</span>
+        <span>−EGP {{ fareEstimate.promoDiscount.toFixed(2) }}</span>
+      </div>
+      <div class="divider"></div>
+      <div class="breakdown-row total">
+        <span>Total Paid</span><span>EGP {{ fareEstimate.total.toFixed(2) }}</span>
+      </div>
+    </div>
+
+    <!-- Payment method -->
+    <div class="section-card">
+      <h3 class="section-title">Payment Method</h3>
+      <div class="payment-methods">
+        <button class="payment-btn" [class.active]="selectedPayment==='wallet'" (click)="selectedPayment='wallet'">
+          <span class="material-icons">account_balance_wallet</span> Wallet
+        </button>
+        <button class="payment-btn" [class.active]="selectedPayment==='cash'" (click)="selectedPayment='cash'">
+          <span class="material-icons">payments</span> Cash
+        </button>
+        <button class="payment-btn" [class.active]="selectedPayment==='card'" (click)="selectedPayment='card'">
+          <span class="material-icons">credit_card</span> Card
+        </button>
+      </div>
+      <div class="wallet-info" *ngIf="selectedPayment==='wallet'">
+        <div class="info-row">
+          <span>Current Balance</span>
+          <span>EGP {{ data.currentUser.walletBalance.toFixed(2) }}</span>
+        </div>
+        <div class="info-row">
+          <span>After Payment</span>
+          <span [class.text-danger]="walletAfterPayment < 0">
+            EGP {{ walletAfterPayment.toFixed(2) }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rating -->
+    <div class="section-card">
+      <h3 class="section-title">Rate your driver</h3>
+      <p class="rating-driver-name">{{ fareEstimate.suggestedDriver.name }}</p>
+      <div class="star-rating">
+        <button *ngFor="let s of [1,2,3,4,5]"
+          class="star-btn"
+          [class.filled]="s <= displayRating"
+          (click)="setRating(s)"
+          (mouseenter)="onStarHover(s)"
+          (mouseleave)="onStarLeave()">★</button>
+      </div>
+      <textarea class="form-control mt-12" rows="3" [(ngModel)]="ratingComment"
+        placeholder="Optional comment (e.g. Great driver, very punctual!)"></textarea>
+    </div>
+
+    <button class="btn btn-primary btn-lg btn-full"
+      [disabled]="userRating === 0"
+      (click)="submitRating()">
+      <span class="material-icons">star</span>
+      Submit Rating
+    </button>
+  </ng-container>
+</div>

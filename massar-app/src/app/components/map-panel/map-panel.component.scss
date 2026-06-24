@@ -1,0 +1,144 @@
+.map-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #eef2f7;
+  overflow: hidden;
+}
+
+.leaflet-map {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* Hide default leaflet divIcon box */
+:host ::ng-deep .massar-pin-icon {
+  background: none !important;
+  border: none !important;
+}
+
+:host ::ng-deep .massar-pin {
+  position: relative;
+  width: 18px;
+  height: 22px;
+}
+
+:host ::ng-deep .massar-pin-head {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--pin);
+  border: 2.5px solid #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  z-index: 2;
+}
+
+:host ::ng-deep .massar-pin-tail {
+  position: absolute;
+  left: 5px;
+  top: 14px;
+  width: 8px;
+  height: 8px;
+  background: var(--pin);
+  transform: rotate(45deg);
+  z-index: 1;
+}
+
+:host ::ng-deep .massar-pin-text {
+  position: absolute;
+  left: 22px;
+  top: -2px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 3px 7px;
+  border-radius: 6px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
+  line-height: 1.25;
+  strong {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    color: #1a2744;
+    font-family: Inter, sans-serif;
+  }
+  em {
+    display: block;
+    font-size: 8px;
+    font-style: normal;
+    color: #6b7280;
+    font-family: Inter, sans-serif;
+  }
+}
+
+:host ::ng-deep .leaflet-control-zoom {
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+  margin-bottom: 20px !important;
+  margin-left: 12px !important;
+}
+
+:host ::ng-deep .leaflet-control-zoom a {
+  font-family: Inter, sans-serif !important;
+  color: #1a2744 !important;
+  width: 32px !important;
+  height: 32px !important;
+  line-height: 32px !important;
+}
+
+.map-overlay-label {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  color: var(--navy);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  z-index: 500;
+}
+
+.map-legend {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  background: white;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 220px;
+  z-index: 500;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.legend-dot.pickup { background: #4a9d8f; }
+.legend-dot.dropoff { background: #f97316; }

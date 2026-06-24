@@ -1,0 +1,154 @@
+<div class="account-panel">
+
+  <!-- Profile header -->
+  <div class="profile-hero">
+    <div class="profile-avatar">{{ initials }}</div>
+    <div class="profile-info">
+      <h2>{{ data.currentUser.name }}</h2>
+      <p>{{ data.currentUser.phone }}</p>
+      <p>{{ data.currentUser.email }}</p>
+    </div>
+    <button class="btn btn-ghost btn-sm edit-btn">
+      <span class="material-icons" style="font-size:16px">edit</span> Edit
+    </button>
+  </div>
+
+  <!-- Wallet -->
+  <div class="section-card wallet-card">
+    <div class="wallet-header">
+      <div>
+        <p class="wallet-label">Wallet Balance</p>
+        <p class="wallet-amount">EGP {{ walletBalance }}</p>
+      </div>
+      <span class="material-icons wallet-icon">account_balance_wallet</span>
+    </div>
+    <div class="top-up-row">
+      <div class="top-up-amounts">
+        <button *ngFor="let a of topUpOptions"
+          class="amount-btn"
+          [class.selected]="isTopUpSelected(a)"
+          (click)="setTopUp(a)">
+          +EGP {{ a }}
+        </button>
+      </div>
+      <button class="btn btn-primary btn-sm" (click)="topUp()">
+        <span class="material-icons" style="font-size:15px">add</span> Top Up
+      </button>
+    </div>
+    <div class="success-msg" *ngIf="topUpSuccess">
+      ✅ EGP {{ topUpAmount }} added to your wallet!
+    </div>
+  </div>
+
+  <!-- Subscription active -->
+  <div class="section-card" *ngIf="data.currentUser.subscription">
+    <h3 class="section-title">
+      <span class="material-icons" style="font-size:16px">workspace_premium</span>
+      Current Subscription
+    </h3>
+    <div class="sub-card">
+      <div class="sub-info">
+        <div class="sub-plan-badge">⭐ {{ data.currentUser.subscription.planName }}</div>
+        <span class="badge badge-success">Active</span>
+      </div>
+      <p class="sub-detail">{{ data.currentUser.subscription.discountPercent }}% discount on all rides</p>
+      <p class="sub-expiry">Valid until {{ data.currentUser.subscription.expiryDate }}</p>
+    </div>
+    <div class="sub-actions">
+      <button class="btn btn-outline btn-sm">Upgrade Plan</button>
+      <button class="btn btn-danger btn-sm">Cancel</button>
+    </div>
+  </div>
+
+  <!-- No subscription -->
+  <div class="section-card" *ngIf="!data.currentUser.subscription">
+    <h3 class="section-title">Subscription Plans</h3>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Get exclusive discounts with a Massar subscription</p>
+    <div class="plan-cards">
+      <div class="plan-card">
+        <p class="plan-name">Silver</p>
+        <p class="plan-discount">5% off</p>
+        <p class="plan-price">EGP 99/mo</p>
+        <button class="btn btn-outline btn-sm btn-full">Subscribe</button>
+      </div>
+      <div class="plan-card featured">
+        <p class="plan-badge">Popular</p>
+        <p class="plan-name">Gold</p>
+        <p class="plan-discount">10% off</p>
+        <p class="plan-price">EGP 179/mo</p>
+        <button class="btn btn-primary btn-sm btn-full">Subscribe</button>
+      </div>
+      <div class="plan-card">
+        <p class="plan-name">Platinum</p>
+        <p class="plan-discount">20% off</p>
+        <p class="plan-price">EGP 299/mo</p>
+        <button class="btn btn-outline btn-sm btn-full">Subscribe</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Promo code -->
+  <div class="section-card">
+    <h3 class="section-title">
+      <span class="material-icons" style="font-size:16px">local_offer</span>
+      Redeem Promo Code
+    </h3>
+    <div class="promo-input-row">
+      <input class="form-control" type="text" [(ngModel)]="promoCode"
+        placeholder="Enter promo code"
+        style="text-transform:uppercase"
+        (keyup.enter)="applyPromo()"/>
+      <button class="btn btn-primary" (click)="applyPromo()">Apply</button>
+    </div>
+    <div class="promo-msg" [class.success]="promoSuccess" *ngIf="promoMessage">
+      {{ promoMessage }}
+    </div>
+    <p class="promo-hint">Try: SUMMER20 · MASSAR10 · WELCOME15</p>
+  </div>
+
+  <!-- Quick stats -->
+  <div class="section-card">
+    <h3 class="section-title">
+      <span class="material-icons" style="font-size:16px">bar_chart</span>
+      Your Stats
+    </h3>
+    <div class="stats-grid">
+      <div class="stat-item">
+        <p class="stat-value">{{ completedRides }}</p>
+        <p class="stat-label">Completed Rides</p>
+      </div>
+      <div class="stat-item">
+        <p class="stat-value">EGP {{ totalSpent }}</p>
+        <p class="stat-label">Total Spent</p>
+      </div>
+      <div class="stat-item">
+        <p class="stat-value">{{ totalDistance }} km</p>
+        <p class="stat-label">Distance Covered</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account actions -->
+  <div class="section-card">
+    <button class="action-link">
+      <span class="material-icons">security</span>
+      Privacy &amp; Security
+      <span class="material-icons ml-auto">chevron_right</span>
+    </button>
+    <button class="action-link">
+      <span class="material-icons">notifications</span>
+      Notifications
+      <span class="material-icons ml-auto">chevron_right</span>
+    </button>
+    <button class="action-link">
+      <span class="material-icons">help</span>
+      Help &amp; Support
+      <span class="material-icons ml-auto">chevron_right</span>
+    </button>
+    <button class="action-link danger">
+      <span class="material-icons">logout</span>
+      Log Out
+    </button>
+  </div>
+
+</div>
