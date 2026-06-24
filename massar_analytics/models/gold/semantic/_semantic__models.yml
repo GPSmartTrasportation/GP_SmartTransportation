@@ -1,0 +1,191 @@
+version: 2
+
+# Semantic KPI views (schema: semantic). AI / text-to-SQL only — not for Power BI marts.
+
+models:
+
+  - name: vw_ride_kpis_daily
+    description: >
+      Daily ride volume and revenue KPIs by calendar day. One row per full_date.
+      Use for questions about rides, completions, cancellations, revenue by day/week/month/occasion.
+    columns:
+      - name: full_date
+        description: "Calendar date of ride request."
+        data_tests:
+          - not_null
+          - unique
+      - name: year
+        description: "Calendar year."
+      - name: month_number
+        description: "Calendar month (1-12)."
+      - name: quarter
+        description: "Calendar quarter (1-4)."
+      - name: day_name
+        description: "Weekday name (Monday, Tuesday, ...)."
+      - name: is_weekend
+        description: "1 = Friday or Saturday (Egypt weekend)."
+      - name: occasion
+        description: "Egypt occasion label: Regular Day, Ramadan, Eid al-Fitr, Eid al-Adha."
+      - name: ride_count
+        description: "Total rides requested on this date."
+      - name: completed_ride_count
+        description: "Rides completed on this date."
+      - name: cancelled_ride_count
+        description: "Rides cancelled on this date."
+      - name: total_amount
+        description: "Sum of ride payment amount (before refunds)."
+      - name: total_net_revenue
+        description: "Sum of net revenue after refunds and discounts."
+      - name: total_refund_amount
+        description: "Sum of refund amounts."
+      - name: avg_minutes_to_accept
+        description: "Average minutes from request to driver accept."
+      - name: avg_minutes_to_complete
+        description: "Average minutes from accept to completion."
+      - name: avg_actual_duration_minutes
+        description: "Average actual trip duration in minutes."
+
+  - name: vw_cancellation_summary
+    description: >
+      Cancelled rides grouped by date, cancellation reason, business domain, and pickup zone.
+      Use for cancellation rate analysis and top cancellation reasons.
+    columns:
+      - name: cancelled_date
+        description: "Date the ride was cancelled."
+        data_tests:
+          - not_null
+      - name: year
+        description: "Calendar year of cancellation."
+      - name: month_number
+        description: "Calendar month of cancellation (1-12)."
+      - name: day_name
+        description: "Weekday name of cancellation date."
+      - name: is_weekend
+        description: "1 = Friday or Saturday (Egypt weekend)."
+      - name: occasion
+        description: "Occasion on cancellation date."
+      - name: reason_title
+        description: "Cancellation reason label from dim_cancellation_reason."
+      - name: applies_to
+        description: "Who the reason applies to (Passenger, Driver, Both, etc.)."
+      - name: domain_name
+        description: "Business domain from ride preference."
+      - name: pickup_zone_name
+        description: "Pickup zone English name."
+      - name: pickup_city_name
+        description: "Pickup city English name."
+      - name: pickup_governorate_name
+        description: "Pickup governorate English name."
+      - name: cancelled_ride_count
+        description: "Number of cancelled rides in this group."
+      - name: avg_minutes_to_accept_before_cancel
+        description: "Average minutes to accept before cancellation (when available)."
+
+  - name: vw_zone_demand
+    description: >
+      Ride demand by pickup zone and day. Use for busiest zones, cities, and governorates.
+    columns:
+      - name: full_date
+        description: "Calendar date of ride request."
+        data_tests:
+          - not_null
+      - name: year
+        description: "Calendar year."
+      - name: month_number
+        description: "Calendar month (1-12)."
+      - name: day_name
+        description: "Weekday name."
+      - name: is_weekend
+        description: "1 = Friday or Saturday (Egypt weekend)."
+      - name: occasion
+        description: "Occasion on request date."
+      - name: pickup_zone_name
+        description: "Pickup zone English name."
+      - name: pickup_city_name
+        description: "Pickup city English name."
+      - name: pickup_governorate_name
+        description: "Pickup governorate English name."
+      - name: ride_count
+        description: "Total rides requested from this zone on this date."
+      - name: completed_ride_count
+        description: "Completed rides from this zone on this date."
+      - name: cancelled_ride_count
+        description: "Cancelled rides from this zone on this date."
+      - name: total_amount
+        description: "Sum of ride payment amount."
+      - name: total_net_revenue
+        description: "Sum of net revenue."
+      - name: avg_passenger_count
+        description: "Average passenger count per ride."
+
+  - name: vw_ride_sla
+    description: >
+      Ride timing / SLA KPIs by day and hour bucket. Use for peak hours, accept time,
+      and completion time analysis.
+    columns:
+      - name: full_date
+        description: "Calendar date of ride request."
+        data_tests:
+          - not_null
+      - name: year
+        description: "Calendar year."
+      - name: month_number
+        description: "Calendar month (1-12)."
+      - name: day_name
+        description: "Weekday name."
+      - name: is_weekend
+        description: "1 = Friday or Saturday (Egypt weekend)."
+      - name: occasion
+        description: "Occasion on request date."
+      - name: hour_24
+        description: "Hour of request (0-23, 24-hour clock)."
+      - name: period_of_day
+        description: "Time bucket: Morning Rush, Lunch, Evening Rush, etc."
+      - name: is_peak_hour
+        description: "1 during defined peak windows (morning, lunch, evening)."
+      - name: ride_count
+        description: "Total rides in this date/hour group."
+      - name: completed_ride_count
+        description: "Completed rides in this group."
+      - name: avg_minutes_to_accept
+        description: "Average minutes from request to accept."
+      - name: avg_minutes_to_complete
+        description: "Average minutes from accept to completion."
+      - name: avg_actual_duration_minutes
+        description: "Average trip duration in minutes."
+      - name: min_minutes_to_accept
+        description: "Minimum minutes to accept in this group."
+      - name: max_minutes_to_accept
+        description: "Maximum minutes to accept in this group."
+      - name: rides_accepted_within_5_min
+        description: "Rides accepted within 5 minutes of request."
+      - name: rides_completed_within_60_min
+        description: "Rides completed within 60 minutes of accept."
+
+  - name: vw_rating_summary
+    description: >
+      Ride rating counts by date, rater role, and score. Use for average ratings and
+      rating distribution without user PII.
+    columns:
+      - name: rating_date
+        description: "Date the rating was submitted."
+        data_tests:
+          - not_null
+      - name: year
+        description: "Calendar year."
+      - name: month_number
+        description: "Calendar month (1-12)."
+      - name: day_name
+        description: "Weekday name."
+      - name: is_weekend
+        description: "1 = Friday or Saturday (Egypt weekend)."
+      - name: occasion
+        description: "Occasion on rating date."
+      - name: rater_role
+        description: "Who gave the rating (Passenger or Driver)."
+      - name: score
+        description: "Rating score (typically 1-5)."
+      - name: rating_count
+        description: "Number of ratings with this date, role, and score."
+      - name: rated_ride_count
+        description: "Distinct rides rated in this group."
